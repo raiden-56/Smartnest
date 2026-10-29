@@ -19,6 +19,7 @@ import { DetailSkeleton } from '../common/States';
 import { NotificationsButton } from '../../features/notifications/NotificationsButton';
 import { SearchDialog } from '../../features/search/SearchDialog';
 import { FeatureGuideDialog, HelpMenu, ProductTour, useTourAutoStart } from '../../features/help/ProductTour';
+import { GuestBanner } from '../../guest/GuestBanner';
 import { NAV } from './nav';
 
 const SIDEBAR_W = 248;
@@ -333,6 +334,7 @@ export function AppShell() {
       )}
 
       <Box sx={{ flex: 1, minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <GuestBanner />
         {/* Top bar */}
         <Box component="header" sx={{ flexShrink: 0, zIndex: 10, bgcolor: 'background.default', borderBottom: `1px solid ${tokens.color.border}` }}>
           <Stack direction="row" alignItems="center" spacing={{ xs: 1, sm: 1.5 }} sx={{ px: { xs: 2, md: 3 }, py: 1.25, maxWidth: 1600, mx: 'auto' }}>

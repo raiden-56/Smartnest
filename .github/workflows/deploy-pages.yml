@@ -1,5 +1,6 @@
 # Publishes the web frontend to GitHub Pages. The API server is not hosted here,
-# so features that call the backend will not work on the Pages site.
+# so the Pages build enables guest mode: visitors can explore with in-browser
+# sample data ("Continue as guest" on the login page).
 name: Deploy to GitHub Pages
 
 on:
@@ -29,6 +30,7 @@ jobs:
       - name: Build
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_GUEST_MODE: 'true'
         run: npm run build:shared && npm run build -w @smartnest/web
       # SPA fallback: GitHub Pages serves 404.html for deep links.
       - run: cp apps/web/dist/index.html apps/web/dist/404.html

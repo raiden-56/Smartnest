@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react';
 import type { RealtimeEvent } from '@smartnest/shared';
 import { api } from '../api/api';
 import { announce, cameraViewers, commandUpdated, deviceRemoved, deviceUpdated, pushToast, sceneExecutionUpdated, setRealtime, useAppDispatch } from '../app/store';
+import { subscribeGuestEvents } from '../guest/events';
+import { isGuest } from '../guest/session';
 
 type Tag = Parameters<typeof api.util.invalidateTags>[0][number];
 
@@ -81,6 +83,12 @@ export function useRealtime(homeId: string | null): void {
           break;
       }
     };
+
+    if (isGuest()) {
+      // Guest mode has no server or WebSocket: the in-browser sample API publishes the same events.
+      dispatch(setRealtime('live'));
+      return subscribeGuestEvents(handle);
+    }
 
     const connect = () => {
       dispatch(setRealtime(attempt === 0 ? 'connecting' : 'reconnecting'));

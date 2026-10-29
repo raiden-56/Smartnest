@@ -1,4 +1,4 @@
-import { createApi, fetchBaseQuery, type FetchBaseQueryError } from '@reduxjs/toolkit/query/react';
+import { createApi, fetchBaseQuery, type BaseQueryFn, type FetchArgs, type FetchBaseQueryError } from '@reduxjs/toolkit/query/react';
 import type {
   ActivityDto,
   AuditLogDto,
@@ -36,6 +36,7 @@ import type {
   UserPreferences,
   HomeRole,
 } from '@smartnest/shared';
+import { GUEST_MODE_AVAILABLE, isGuest } from '../guest/session';
 
 export interface ApiError {
   status: number | string;
@@ -64,17 +65,25 @@ export type CatalogueIntegration = IntegrationDefinition & { implemented: boolea
 
 const clean = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined && v !== '' && v !== null)) as Record<string, string>;
 
+const serverQuery = fetchBaseQuery({
+  baseUrl: '/api',
+  credentials: 'include',
+  timeout: 30_000,
+  prepareHeaders: (h) => {
+    h.set('X-SmartNest-CSRF', '1');
+    return h;
+  },
+});
+
+/** In guest mode (frontend-only builds) every request is answered in the browser from sample data. */
+const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = async (args, bq, extra) => {
+  if (GUEST_MODE_AVAILABLE && isGuest()) return (await import('../guest/server')).guestBaseQuery(args);
+  return serverQuery(args, bq, extra);
+};
+
 export const api = createApi({
   reducerPath: 'api',
-  baseQuery: fetchBaseQuery({
-    baseUrl: '/api',
-    credentials: 'include',
-    timeout: 30_000,
-    prepareHeaders: (h) => {
-      h.set('X-SmartNest-CSRF', '1');
-      return h;
-    },
-  }),
+  baseQuery,
   tagTypes: [
     'Me', 'Homes', 'Home', 'Rooms', 'Devices', 'Device', 'DeviceCounts', 'Integrations', 'Discovered', 'Scenes', 'SceneExecutions', 'Automations',
     'AutomationExecutions', 'Activity', 'Notifications', 'Dashboard', 'Energy', 'Network', 'Cameras', 'Members', 'Invitations', 'Sessions', 'Audit', 'DeviceCommands',
