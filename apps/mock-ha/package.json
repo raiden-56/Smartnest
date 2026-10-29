@@ -1,0 +1,20 @@
+{
+  "name": "@smartnest/mock-ha",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Deterministic mock of the Home Assistant REST + WebSocket API, used by automated tests. Not a Home Assistant replacement.",
+  "main": "./src/server.ts",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.2"
+  }
+}

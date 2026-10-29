@@ -1,0 +1,608 @@
+// SmartNest database schema
+//
+// Conventions
+// - Every home-scoped table carries `homeId` and is indexed on it: all queries
+//   are filtered by the caller's home membership.
+// - External integration identifiers are unique *within their integration*
+//   (`@@unique([integrationId, externalId])`), never globally.
+// - Credentials never live on Device/Integration rows. They are stored
+//   AES-256-GCM encrypted in IntegrationCredentialReference.
+// - High-frequency state is not kept forever: DeviceStateSnapshot rows are
+//   pruned by the retention job (Home.retentionSnapshotDays), and energy data
+//   is aggregated into hourly EnergyReading buckets.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Identity ─────────────────────────────────────────────────────────────
+
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  name              String
+  /// scrypt hash: "scrypt$N$r$p$salt$hash"
+  passwordHash      String
+  passwordChangedAt DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  sessions       Session[]
+  memberships    HomeMembership[]
+  resetTokens    PasswordResetToken[]
+  preference     UserPreference?
+  dashboards     DashboardLayout[]
+  notifications  Notification[]
+  commands       DeviceCommand[]
+  auditLogs      AuditLog[]
+  sentInvites    Invitation[]      @relation("InvitedBy")
+}
+
+/// Server-side sessions. Only a SHA-256 hash of the cookie token is stored.
+model Session {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  userAgent  String?
+  ipAddress  String?
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+  expiresAt  DateTime
+  /// Set when the user re-enters their password; sensitive actions require a recent value.
+  reauthAt   DateTime?
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model UserPreference {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  /// Validated by userPreferencesSchema in @smartnest/shared
+  data      Json     @default("{}")
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── Homes & membership ───────────────────────────────────────────────────
+
+enum HomeRole {
+  owner
+  admin
+  member
+  guest
+}
+
+model Home {
+  id                     String   @id @default(cuid())
+  name                   String
+  timezone               String
+  locale                 String   @default("en-GB")
+  temperatureUnit        String   @default("C")
+  latitude               Float?
+  longitude              Float?
+  currency               String?
+  tariffPerKWh           Float?
+  /// Demo homes contain only simulated devices and never send external notifications.
+  isDemo                 Boolean  @default(false)
+  onboardingCompleted    Boolean  @default(false)
+  retentionActivityDays  Int      @default(90)
+  retentionSnapshotDays  Int      @default(7)
+  retentionCameraDays    Int      @default(30)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  memberships   HomeMembership[]
+  invitations   Invitation[]
+  rooms         Room[]
+  integrations  Integration[]
+  devices       Device[]
+  scenes        Scene[]
+  automations   Automation[]
+  activity      ActivityEvent[]
+  notifications Notification[]
+  dashboards    DashboardLayout[]
+  commands      DeviceCommand[]
+  energy        EnergyReading[]
+  auditLogs     AuditLog[]
+}
+
+model HomeMembership {
+  id        String   @id @default(cuid())
+  homeId    String
+  userId    String
+  role      HomeRole
+  createdAt DateTime @default(now())
+  home      Home     @relation(fields: [homeId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([homeId, userId])
+  @@index([userId])
+}
+
+model Invitation {
+  id          String    @id @default(cuid())
+  homeId      String
+  email       String
+  role        HomeRole
+  tokenHash   String    @unique
+  invitedById String
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  home        Home      @relation(fields: [homeId], references: [id], onDelete: Cascade)
+  invitedBy   User      @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@index([homeId])
+}
+
+model Room {
+  id            String   @id @default(cuid())
+  homeId        String
+  name          String
+  icon          String   @default("home")
+  coverImageUrl String?
+  isFavourite   Boolean  @default(false)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  home          Home     @relation(fields: [homeId], references: [id], onDelete: Cascade)
+  devices       Device[]
+  scenes        Scene[]
+
+  @@index([homeId, sortOrder])
+}
+
+// ─── Integrations ─────────────────────────────────────────────────────────
+
+model Integration {
+  id              String    @id @default(cuid())
+  homeId          String
+  /// demo | home_assistant | …  (see INTEGRATIONS in @smartnest/shared)
+  type            String
+  name            String
+  /// connected | connecting | error | auth_failed | disconnected
+  status          String    @default("connecting")
+  statusMessage   String?
+  /// Non-secret connection target (e.g. HA base URL). Never contains credentials.
+  baseUrl         String?
+  isDemo          Boolean   @default(false)
+  /// Non-secret adapter settings
+  config          Json      @default("{}")
+  lastSyncAt      DateTime?
+  lastConnectedAt DateTime?
+  disconnectedAt  DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  home        Home                            @relation(fields: [homeId], references: [id], onDelete: Cascade)
+  credential  IntegrationCredentialReference?
+  devices     Device[]
+  discovered  DiscoveredEntity[]
+  automations Automation[]
+
+  @@index([homeId])
+}
+
+/// Encrypted credential material for an integration (AES-256-GCM).
+/// `ciphertext` = base64(iv | authTag | encrypted). Never returned by the API.
+model IntegrationCredentialReference {
+  id            String   @id @default(cuid())
+  integrationId String   @unique
+  kind          String
+  ciphertext    String
+  keyVersion    Int      @default(1)
+  createdAt     DateTime @default(now())
+  rotatedAt     DateTime?
+  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+}
+
+/// Results of the most recent discovery run, so users can review and import later.
+model DiscoveredEntity {
+  id            String   @id @default(cuid())
+  integrationId String
+  externalId    String
+  name          String
+  category      String
+  deviceType    String?
+  manufacturer  String?
+  model         String?
+  capabilities  Json
+  connectivity  String
+  suggestedRoom String?
+  discoveredAt  DateTime @default(now())
+  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@unique([integrationId, externalId])
+}
+
+// ─── Devices ──────────────────────────────────────────────────────────────
+
+model Device {
+  id            String    @id @default(cuid())
+  homeId        String
+  integrationId String
+  /// Identifier inside the integration (e.g. HA entity_id). Unique per integration.
+  externalId    String
+  name          String
+  category      String
+  deviceType    String?
+  manufacturer  String?
+  model         String?
+  roomId        String?
+  isFavourite   Boolean   @default(false)
+  /// Hidden/ignored devices stay connected but are excluded from default views.
+  isHidden      Boolean   @default(false)
+  /// online | offline | unavailable | unknown — independent of operating state
+  connectivity  String    @default("unknown")
+  /// Last known normalised state (DeviceState). Only contains reported values.
+  state         Json      @default("{}")
+  stateUpdatedAt DateTime?
+  lastSeenAt    DateTime?
+  lastCommandAt DateTime?
+  lastError     String?
+  metadata      Json      @default("{}")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  home         Home                  @relation(fields: [homeId], references: [id], onDelete: Cascade)
+  integration  Integration           @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  room         Room?                 @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  capabilities DeviceCapability[]
+  snapshots    DeviceStateSnapshot[]
+  commands     DeviceCommand[]
+  sceneActions SceneAction[]
+  energy       EnergyReading[]
+
+  @@unique([integrationId, externalId])
+  @@index([homeId, category])
+  @@index([homeId, connectivity])
+  @@index([homeId, name])
+  @@index([roomId])
+}
+
+model DeviceCapability {
+  id       String @id @default(cuid())
+  deviceId String
+  type     String
+  /// Capability parameters (ranges, modes…), validated by capabilitySchema
+  config   Json   @default("{}")
+  device   Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  /// A device may declare several capabilities of one type (e.g. multiple sensors)
+  @@index([deviceId])
+  @@index([type])
+}
+
+/// Sampled state history. Pruned after Home.retentionSnapshotDays.
+model DeviceStateSnapshot {
+  id           String   @id @default(cuid())
+  deviceId     String
+  homeId       String
+  state        Json
+  connectivity String
+  recordedAt   DateTime @default(now())
+  device       Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId, recordedAt])
+  @@index([recordedAt])
+}
+
+/// Hourly energy aggregates (kWh) per device. Kept for 400 days.
+model EnergyReading {
+  id          String   @id @default(cuid())
+  homeId      String
+  deviceId    String
+  /// consumption | solar | battery | ev
+  kind        String
+  periodStart DateTime
+  kWh         Float
+  isDemo      Boolean  @default(false)
+  home        Home     @relation(fields: [homeId], references: [id], onDelete: Cascade)
+  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@unique([deviceId, kind, periodStart])
+  @@index([homeId, periodStart])
+}
+
+// ─── Commands ─────────────────────────────────────────────────────────────
+
+model DeviceCommand {
+  id             String    @id @default(cuid())
+  homeId         String
+  deviceId       String
+  userId         String?
+  /// user | scene | automation
+  source         String    @default("user")
+  /// SceneExecution / AutomationExecution id when source != user
+  sourceId       String?
+  /// Validated DeviceCommand, secrets redacted
+  command        Json
+  /// pending | sent | confirmed | failed | timed_out
+  status         String    @default("pending")
+  /// true when confirmed by state read-back rather than acknowledgement only
+  verified       Boolean   @default(false)
+  idempotencyKey String?
+  createdAt      DateTime  @default(now())
+  sentAt         DateTime?
+  completedAt    DateTime?
+
+  home   Home                 @relation(fields: [homeId], references: [id], onDelete: Cascade)
+  device Device               @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  user   User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  result DeviceCommandResult?
+
+  @@unique([homeId, idempotencyKey])
+  @@index([deviceId, createdAt])
+  @@index([homeId, createdAt])
+  @@index([status])
+}
+
+model DeviceCommandResult {
+  id             String   @id @default(cuid())
+  commandId      String   @unique
+  status         String
+  errorCode      String?
+  errorMessage   String?
+  confirmedState Json?
+  durationMs     Int?
+  createdAt      DateTime @default(now())
+  command        DeviceCommand @relation(fields: [commandId], references: [id], onDelete: Cascade)
+}
+
+// ─── Scenes ───────────────────────────────────────────────────────────────
+
+model Scene {
+  id                    String   @id @default(cuid())
+  homeId                String
+  roomId                String?
+  name                  String
+  icon                  String   @default("sparkles")
+  description           String   @default("")
+  /// parallel | sequential
+  executionMode         String   @default("parallel")
+  isFavourite           Boolean  @default(false)
+  allowSensitiveActions Boolean  @default(false)
+  createdById           String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  home       Home             @relation(fields: [homeId], references: [id], onDelete: Cascade)
+  room       Room?            @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  actions    SceneAction[]
+  executions SceneExecution[]
+
+  @@index([homeId])
+}
+
+model SceneAction {
+  id       String @id @default(cuid())
+  sceneId  String
+  deviceId String
+  command  Json
+  order    Int    @default(0)
+  scene    Scene  @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  device   Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([sceneId])
+}
+
+model SceneExecution {
+  id            String    @id @default(cuid())
+  sceneId       String
+  homeId        String
+  /// running | succeeded | partial | failed
+  status        String    @default("running")
+  source        String    @default("user")
+  triggeredById String?
+  results       Json      @default("[]")
+  startedAt     DateTime  @default(now())
+  completedAt   DateTime?
+  scene         Scene     @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+
+  @@index([sceneId, startedAt])
+}
+
+// ─── Automations ──────────────────────────────────────────────────────────
+
+model Automation {
+  id                    String    @id @default(cuid())
+  homeId                String
+  name                  String
+  description           String    @default("")
+  enabled               Boolean   @default(false)
+  isDraft               Boolean   @default(false)
+  /// Which platform runs this rule: smartnest | home_assistant. Never both.
+  executor              String    @default("smartnest")
+  /// For home_assistant automations: the HA entity id
+  integrationId         String?
+  externalId            String?
+  conditionOperator     String    @default("and")
+  cooldownSeconds       Int       @default(30)
+  allowSensitiveActions Boolean   @default(false)
+  lastRunAt             DateTime?
+  lastRunStatus         String?
+  createdById           String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  home        Home                  @relation(fields: [homeId], references: [id], onDelete: Cascade)
+  integration Integration?          @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  triggers    AutomationTrigger[]
+  conditions  AutomationCondition[]
+  actions     AutomationAction[]
+  executions  AutomationExecution[]
+
+  @@unique([integrationId, externalId])
+  @@index([homeId, enabled])
+}
+
+model AutomationTrigger {
+  id           String     @id @default(cuid())
+  automationId String
+  order        Int
+  type         String
+  config       Json
+  automation   Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+  @@index([automationId])
+  @@index([type])
+}
+
+model AutomationCondition {
+  id           String     @id @default(cuid())
+  automationId String
+  order        Int
+  type         String
+  config       Json
+  automation   Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+  @@index([automationId])
+}
+
+model AutomationAction {
+  id           String     @id @default(cuid())
+  automationId String
+  order        Int
+  type         String
+  config       Json
+  automation   Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+  @@index([automationId])
+}
+
+model AutomationExecution {
+  id           String     @id @default(cuid())
+  automationId String
+  homeId       String
+  /// running | succeeded | partial | failed | skipped | simulated
+  status       String     @default("running")
+  triggeredBy  String
+  steps        Json       @default("[]")
+  error        String?
+  depth        Int        @default(0)
+  startedAt    DateTime   @default(now())
+  completedAt  DateTime?
+  automation   Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+  @@index([automationId, startedAt])
+  @@index([homeId, startedAt])
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────
+
+/// One layout per user per home.
+model DashboardLayout {
+  id        String            @id @default(cuid())
+  userId    String
+  homeId    String
+  updatedAt DateTime          @updatedAt
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  home      Home              @relation(fields: [homeId], references: [id], onDelete: Cascade)
+  widgets   DashboardWidget[]
+
+  @@unique([userId, homeId])
+}
+
+model DashboardWidget {
+  id        String          @id @default(cuid())
+  layoutId  String
+  widgetKey String
+  type      String
+  x         Int
+  y         Int
+  w         Int
+  h         Int
+  hidden    Boolean         @default(false)
+  config    Json            @default("{}")
+  layout    DashboardLayout @relation(fields: [layoutId], references: [id], onDelete: Cascade)
+
+  @@unique([layoutId, widgetKey])
+}
+
+// ─── Activity, notifications & audit ──────────────────────────────────────
+
+model ActivityEvent {
+  id          String   @id @default(cuid())
+  homeId      String
+  type        String
+  title       String
+  detail      String?
+  /// info | success | warning | critical
+  severity    String   @default("info")
+  /// success | failure | pending
+  result      String?
+  /// user | automation | scene | integration | system
+  source      String
+  actorUserId String?
+  actorName   String?
+  deviceId    String?
+  deviceName  String?
+  roomId      String?
+  category    String?
+  metadata    Json     @default("{}")
+  isDemo      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  home        Home     @relation(fields: [homeId], references: [id], onDelete: Cascade)
+
+  @@index([homeId, createdAt])
+  @@index([homeId, type, createdAt])
+  @@index([deviceId, createdAt])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  homeId    String
+  userId    String
+  title     String
+  body      String
+  severity  String    @default("info")
+  category  String
+  link      String?
+  /// Delivery channel. Only "in_app" is implemented; demo homes never use others.
+  channel   String    @default("in_app")
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  home      Home      @relation(fields: [homeId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, homeId, createdAt])
+  @@index([userId, readAt])
+}
+
+/// Security-relevant actions (logins, role changes, sensitive commands, credential changes).
+model AuditLog {
+  id         String   @id @default(cuid())
+  homeId     String?
+  userId     String?
+  action     String
+  targetType String?
+  targetId   String?
+  metadata   Json     @default("{}")
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+  home       Home?    @relation(fields: [homeId], references: [id], onDelete: Cascade)
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([homeId, createdAt])
+  @@index([userId, createdAt])
+}

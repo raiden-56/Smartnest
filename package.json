@@ -1,0 +1,44 @@
+{
+  "name": "smartnest",
+  "private": true,
+  "version": "0.1.0",
+  "description": "SmartNest — Your entire home. One intelligent control centre.",
+  "workspaces": [
+    "packages/shared",
+    "apps/server",
+    "apps/web",
+    "apps/mock-ha"
+  ],
+  "scripts": {
+    "db:up": "docker compose up -d db",
+    "db:down": "docker compose down",
+    "build:shared": "npm run build -w @smartnest/shared",
+    "dev": "npm run build:shared && concurrently -n server,web -c green,yellow \"npm run dev -w @smartnest/server\" \"npm run dev -w @smartnest/web\"",
+    "dev:server": "npm run dev -w @smartnest/server",
+    "dev:web": "npm run dev -w @smartnest/web",
+    "mock-ha": "npm run start -w @smartnest/mock-ha",
+    "db:migrate": "npm run db:migrate -w @smartnest/server",
+    "db:seed": "npm run db:seed -w @smartnest/server",
+    "build": "npm run build:shared && npm run build -w @smartnest/server && npm run build -w @smartnest/web",
+    "typecheck": "npm run build:shared && npm run typecheck --workspaces --if-present",
+    "test": "npm run build:shared && npm run test -w @smartnest/shared && npm run test -w @smartnest/server && npm run test -w @smartnest/web",
+    "test:e2e": "playwright test",
+    "lint:secrets": "node scripts/check-secrets.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "concurrently": "^9.1.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "allowScripts": {
+    "esbuild@0.27.7": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.2": true,
+    "prisma@6.19.3": true,
+    "@prisma/engines@6.19.3": true,
+    "@prisma/client@6.19.3": true
+  }
+}
