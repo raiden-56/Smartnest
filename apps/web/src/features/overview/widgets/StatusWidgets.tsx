@@ -1,4 +1,4 @@
-import { Box, Button, Card, Chip, Stack, Typography } from '@mui/material';
+import { Box, Button, Chip, Stack, Tooltip, Typography } from '@mui/material';
 import { Activity, AlertTriangle, Bot, CheckCircle2, CircleHelp, Cpu, Network, ShieldAlert, Wifi, WifiOff, XCircle, Zap } from 'lucide-react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip as ChartTooltip, XAxis } from 'recharts';
 import { Link as RouterLink } from 'react-router-dom';
@@ -6,10 +6,10 @@ import { formatEnergy, formatPower } from '@smartnest/shared';
 import { useActivityQuery, useAutomationsQuery, useDeviceCountsQuery, useEnergyQuery, useNetworkQuery, useRoomsQuery } from '../../../api/api';
 import { formatTime, timeAgo, useFormatTemperature, useHome } from '../../../app/hooks';
 import { AppIcon } from '../../../components/common/AppIcon';
-import { DemoBadge, SeverityDot } from '../../../components/common/StatusBadge';
+import { DemoBadge, DemoMark, SeverityDot } from '../../../components/common/StatusBadge';
 import { ChartSkeleton, ErrorState, ListSkeleton, NotAvailable } from '../../../components/common/States';
 import { tokens } from '../../../theme/theme';
-import { WidgetCard, WidgetEmpty, WidgetRow, type WidgetProps } from './WidgetFrame';
+import { MoreLink, WidgetCard, WidgetEmpty, WidgetRow, type WidgetProps } from './WidgetFrame';
 import { computeSecurityAlerts, useSecurityDevices } from './useOverviewData';
 
 // ─── Summary ──────────────────────────────────────────────────────────────
@@ -17,31 +17,45 @@ import { computeSecurityAlerts, useSecurityDevices } from './useOverviewData';
 function Stat({ icon, label, value, tone = 'default', to, hint }: { icon: React.ReactNode; label: string; value: React.ReactNode; tone?: 'default' | 'good' | 'warn' | 'bad'; to?: string; hint?: string }) {
   const colors = { default: ['sage.main', 'primary.dark'], good: ['#E3F0E7', 'success.main'], warn: ['#F8EEDC', 'warning.dark'], bad: ['#F8E4E2', 'error.main'] }[tone];
   const content = (
-    <Card sx={{ p: 1.75, height: '100%', boxShadow: 'none', bgcolor: '#FCFBF8', transition: 'border-color 150ms', ...(to ? { '&:hover': { borderColor: 'primary.light' } } : {}) }}>
-      <Stack direction="row" spacing={1.25} alignItems="center">
-        <Box sx={{ width: 34, height: 34, borderRadius: '10px', bgcolor: colors[0], color: colors[1], display: 'grid', placeItems: 'center', flexShrink: 0 }} aria-hidden>
-          {icon}
-        </Box>
-        <Box sx={{ minWidth: 0 }}>
-          <Typography variant="caption" component="div" title={hint ?? label} sx={{ lineHeight: 1.25, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-            {label}
-          </Typography>
-          <Typography sx={{ fontWeight: 750, fontSize: '1.35rem', lineHeight: 1.2 }} noWrap>
-            {value}
-          </Typography>
-        </Box>
-      </Stack>
-    </Card>
+    <Stack
+      direction="row"
+      spacing={1.25}
+      alignItems="center"
+      sx={{
+        px: 1.5, py: 1.125, height: '100%', bgcolor: 'background.paper', border: `1px solid ${tokens.color.border}`, borderRadius: `${tokens.radius.md}px`,
+        transition: 'border-color 150ms, box-shadow 150ms', ...(to ? { '&:hover': { borderColor: 'primary.light', boxShadow: tokens.shadow.card } } : {}),
+      }}
+    >
+      <Box sx={{ width: 32, height: 32, borderRadius: '10px', bgcolor: colors[0], color: colors[1], display: 'grid', placeItems: 'center', flexShrink: 0 }} aria-hidden>
+        {icon}
+      </Box>
+      <Box sx={{ minWidth: 0 }}>
+        <Typography sx={{ fontWeight: 750, fontSize: '1.2rem', lineHeight: 1.15 }} noWrap>
+          {value}
+        </Typography>
+        <Typography variant="caption" component="div" noWrap>
+          {label}
+        </Typography>
+      </Box>
+    </Stack>
   );
-  return to ? (
-    <Box component={RouterLink} to={to} sx={{ textDecoration: 'none', color: 'inherit', display: 'block', borderRadius: `${tokens.radius.lg}px` }}>
+  const body = to ? (
+    <Box component={RouterLink} to={to} sx={{ textDecoration: 'none', color: 'inherit', display: 'block', height: '100%', borderRadius: `${tokens.radius.md}px` }}>
       {content}
     </Box>
   ) : (
     content
   );
+  return hint ? (
+    <Tooltip title={<span style={{ whiteSpace: 'pre-line' }}>{hint}</span>}>
+      <Box sx={{ minWidth: 0 }}>{body}</Box>
+    </Tooltip>
+  ) : (
+    <Box sx={{ minWidth: 0 }}>{body}</Box>
+  );
 }
 
+/** Compact KPI strip — rendered without a surrounding card. */
 export function SummaryWidget(_: WidgetProps) {
   const { homeId, can } = useHome();
   const counts = useDeviceCountsQuery(homeId, { skip: !can('devices.view'), pollingInterval: 60_000 });
@@ -51,16 +65,19 @@ export function SummaryWidget(_: WidgetProps) {
   const c = counts.data;
   const dash = (v: number | undefined) => (v === undefined ? '—' : v);
   return (
-    <WidgetCard title="Home summary" hideTitle>
+    <Box component="section" aria-labelledby="summary-title" data-tour="summary">
+      <Typography id="summary-title" component="h2" sx={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>
+        Home summary
+      </Typography>
       {counts.error ? (
         <ErrorState error={counts.error} onRetry={counts.refetch} title="Could not load device counts" />
       ) : (
-        <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', height: '100%', alignContent: 'center' }} aria-busy={counts.isLoading}>
-          <Stat icon={<Cpu size={18} />} label="Total devices" value={dash(c?.total)} to="/devices" />
-          <Stat icon={<Wifi size={18} />} label="Online" value={dash(c?.online)} tone="good" to="/devices?connectivity=online" />
-          <Stat icon={<WifiOff size={18} />} label="Offline" value={dash(c?.offline)} tone={c?.offline ? 'bad' : 'default'} to="/devices?connectivity=offline" />
+        <Box sx={{ display: 'grid', gap: 1.25, gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }} aria-busy={counts.isLoading}>
+          <Stat icon={<Cpu size={17} />} label="Total devices" value={dash(c?.total)} to="/devices" />
+          <Stat icon={<Wifi size={17} />} label="Online" value={dash(c?.online)} tone="good" to="/devices?connectivity=online" />
+          <Stat icon={<WifiOff size={17} />} label="Offline" value={dash(c?.offline)} tone={c?.offline ? 'bad' : 'default'} to="/devices?connectivity=offline" />
           <Stat
-            icon={<CircleHelp size={18} />}
+            icon={<CircleHelp size={17} />}
             label="Unavailable / unknown"
             hint="Unavailable: the integration reports the device unavailable. Unknown: SmartNest cannot currently determine connectivity."
             value={c ? `${c.unavailable} / ${c.unknown}` : '—'}
@@ -68,25 +85,27 @@ export function SummaryWidget(_: WidgetProps) {
             to="/devices?connectivity=unavailable"
           />
           <Stat
-            icon={<ShieldAlert size={18} />}
+            icon={<ShieldAlert size={17} />}
             label="Security alerts"
             value={security.isLoading ? '—' : alerts.length}
             tone={alerts.length ? 'bad' : 'good'}
             hint={alerts.map((a) => `${a.device.name}: ${a.reason}`).join('\n') || 'No active alerts reported'}
           />
           <Stat
-            icon={<Zap size={18} />}
+            icon={<Zap size={17} />}
             label={energy.data?.sources.some((s) => s.isDemo) ? 'Power now (demo)' : 'Power now'}
             value={!can('energy.view') ? <NotAvailable /> : energy.isLoading ? '—' : energy.data?.currentPowerW != null ? formatPower(energy.data.currentPowerW) : <NotAvailable />}
             to={can('energy.view') ? '/energy' : undefined}
           />
         </Box>
       )}
-    </WidgetCard>
+    </Box>
   );
 }
 
 // ─── Rooms ────────────────────────────────────────────────────────────────
+
+const ROOMS_SHOWN = 5;
 
 export function RoomsWidget(_: WidgetProps) {
   const { homeId } = useHome();
@@ -117,7 +136,7 @@ export function RoomsWidget(_: WidgetProps) {
         />
       ) : (
         <Box>
-          {q.data.rooms.map((r) => (
+          {q.data.rooms.slice(0, ROOMS_SHOWN).map((r) => (
             <Box key={r.id} component={RouterLink} to={`/rooms/${r.id}`} sx={{ display: 'block', textDecoration: 'none', color: 'inherit', borderRadius: 2, '&:hover': { bgcolor: 'action.hover' } }}>
               <WidgetRow
                 leading={
@@ -143,6 +162,7 @@ export function RoomsWidget(_: WidgetProps) {
               />
             </Box>
           ))}
+          <MoreLink to="/rooms" hidden={q.data.rooms.length - ROOMS_SHOWN} noun="rooms" />
         </Box>
       )}
     </WidgetCard>
@@ -154,7 +174,7 @@ export function RoomsWidget(_: WidgetProps) {
 export function ActivityWidget(_: WidgetProps) {
   const { homeId, can } = useHome();
   const allowed = can('activity.view');
-  const q = useActivityQuery({ homeId, limit: 8 }, { skip: !allowed });
+  const q = useActivityQuery({ homeId, limit: 5 }, { skip: !allowed });
   return (
     <WidgetCard
       title="Recent activity"
@@ -188,7 +208,7 @@ export function ActivityWidget(_: WidgetProps) {
                     {a.result === 'failure' ? ' · failed' : ''}
                   </>
                 }
-                trailing={a.isDemo ? <DemoBadge compact /> : undefined}
+                trailing={a.isDemo ? <DemoMark /> : undefined}
               />
             </Box>
           ))}
@@ -245,7 +265,7 @@ export function AutomationsWidget(_: WidgetProps) {
         />
       ) : (
         <Box>
-          {enabled.map((a) => {
+          {enabled.slice(0, 4).map((a) => {
             const st = a.lastRunStatus ? RUN_STATUS[a.lastRunStatus] : null;
             return (
               <Box key={a.id} component={RouterLink} to={`/automations/${a.id}`} sx={{ display: 'block', textDecoration: 'none', color: 'inherit', borderRadius: 2, '&:hover': { bgcolor: 'action.hover' } }}>
@@ -267,6 +287,7 @@ export function AutomationsWidget(_: WidgetProps) {
               </Box>
             );
           })}
+          <MoreLink to="/automations" hidden={enabled.length - 4} noun="automations" />
         </Box>
       )}
     </WidgetCard>
@@ -304,7 +325,7 @@ export function EnergyWidget(_: WidgetProps) {
       ) : !e?.available ? (
         <WidgetEmpty icon={<Zap size={20} />} title="No energy data" description="Connect a smart meter, energy-monitoring plug or solar inverter through an integration to see consumption here." />
       ) : (
-        <Stack spacing={1.5} sx={{ height: '100%' }}>
+        <Stack spacing={1.25}>
           <Stack direction="row" spacing={3} flexWrap="wrap" useFlexGap>
             <Box>
               <Typography variant="caption" component="div">
@@ -333,8 +354,8 @@ export function EnergyWidget(_: WidgetProps) {
               </Box>
             )}
           </Stack>
-          <Box sx={{ flex: 1, minHeight: 100 }} role="img" aria-label={`Hourly energy use today. Total ${e.totals.todayKWh ?? 0} kilowatt hours.`}>
-            <ResponsiveContainer width="100%" height="100%" minHeight={100}>
+          <Box sx={{ height: 120 }} role="img" aria-label={`Hourly energy use today. Total ${e.totals.todayKWh ?? 0} kilowatt hours.`}>
+            <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={e.series} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
                 <defs>
                   <linearGradient id="ov-energy" x1="0" y1="0" x2="0" y2="1">
@@ -426,7 +447,7 @@ export function NetworkWidget(_: WidgetProps) {
               </Typography>
             </Box>
           </Stack>
-          {n.routers.map((r) => (
+          {n.routers.slice(0, 3).map((r) => (
             <WidgetRow
               key={r.id}
               leading={r.status === 'online' ? <Wifi size={16} color={tokens.color.success} aria-hidden /> : <WifiOff size={16} color={r.status === 'offline' ? tokens.color.error : tokens.color.textSecondary} aria-hidden />}

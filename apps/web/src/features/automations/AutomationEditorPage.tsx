@@ -341,7 +341,7 @@ function Editor({ homeId, existing, homeHasLocation }: { homeId: string; existin
             </SectionCard>
           </Stack>
 
-          <Stack spacing={2} sx={{ position: { lg: 'sticky' }, top: { lg: 88 } }}>
+          <Stack spacing={2} sx={{ position: { lg: 'sticky' }, top: { lg: 16 } }}>
             <SectionCard title="Settings">
               <Stack spacing={2}>
                 <LabeledSwitch checked={values.enabled} onChange={(v) => set('enabled', v)} label="Enabled after saving" description="Ignored for drafts — drafts never run." />

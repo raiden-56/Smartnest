@@ -86,21 +86,27 @@ export function validateDashboardLayout(widgets: DashboardWidget[]): LayoutIssue
   return issues;
 }
 
+/**
+ * Default dashboard: a summary strip, a wide main column (columns 0–7; two half-width widgets share
+ * a row) and a narrow side column (columns 8–11) for lists. The web app sizes widgets to their content.
+ */
 export function defaultDashboardLayout(): DashboardWidget[] {
   const w = (id: string, type: WidgetType, x: number, y: number, ww: number, h: number): DashboardWidget => ({ id, type, x, y, w: ww, h, hidden: false, config: {} });
   return [
     w('summary', 'summary', 0, 0, 12, 2),
+    // Main column
     w('favourites', 'favourites', 0, 2, 8, 4),
+    w('camera', 'camera', 0, 6, 4, 4),
+    w('climate', 'climate', 4, 6, 4, 4),
+    w('energy', 'energy', 0, 10, 4, 3),
+    w('automations', 'automations', 4, 10, 4, 3),
+    w('rooms', 'rooms', 0, 13, 4, 4),
+    w('activity', 'activity', 4, 13, 4, 4),
+    // Side column
     w('quickActions', 'quickActions', 8, 2, 4, 2),
-    w('security', 'security', 8, 4, 4, 2),
-    w('camera', 'camera', 0, 6, 5, 4),
-    w('climate', 'climate', 5, 6, 3, 4),
-    w('activity', 'activity', 8, 6, 4, 4),
-    w('rooms', 'rooms', 0, 10, 4, 4),
-    w('energy', 'energy', 4, 10, 4, 4),
-    w('automations', 'automations', 8, 10, 4, 4),
-    w('attention', 'attention', 0, 14, 4, 3),
-    w('lowBattery', 'lowBattery', 4, 14, 4, 3),
-    w('network', 'network', 8, 14, 4, 3),
+    w('security', 'security', 8, 4, 4, 3),
+    w('attention', 'attention', 8, 7, 4, 3),
+    w('lowBattery', 'lowBattery', 8, 10, 4, 3),
+    w('network', 'network', 8, 13, 4, 3),
   ];
 }

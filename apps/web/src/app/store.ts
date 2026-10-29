@@ -30,11 +30,14 @@ interface UiState {
   sidebarCollapsed: boolean;
   realtime: RealtimeStatus;
   searchOpen: boolean;
+  /** Guided product tour and the feature guide dialog */
+  tourOpen: boolean;
+  guideOpen: boolean;
 }
 
 const uiSlice = createSlice({
   name: 'ui',
-  initialState: { currentHomeId: safeGet(HOME_KEY), sidebarCollapsed: safeGet(SIDEBAR_KEY) === '1', realtime: 'connecting', searchOpen: false } as UiState,
+  initialState: { currentHomeId: safeGet(HOME_KEY), sidebarCollapsed: safeGet(SIDEBAR_KEY) === '1', realtime: 'connecting', searchOpen: false, tourOpen: false, guideOpen: false } as UiState,
   reducers: {
     setCurrentHome(s, a: PayloadAction<string | null>) {
       s.currentHomeId = a.payload;
@@ -49,6 +52,12 @@ const uiSlice = createSlice({
     },
     setSearchOpen(s, a: PayloadAction<boolean>) {
       s.searchOpen = a.payload;
+    },
+    setTourOpen(s, a: PayloadAction<boolean>) {
+      s.tourOpen = a.payload;
+    },
+    setGuideOpen(s, a: PayloadAction<boolean>) {
+      s.guideOpen = a.payload;
     },
   },
 });
@@ -137,7 +146,7 @@ const feedbackSlice = createSlice({
   },
 });
 
-export const { setCurrentHome, toggleSidebar, setRealtime, setSearchOpen } = uiSlice.actions;
+export const { setCurrentHome, toggleSidebar, setRealtime, setSearchOpen, setTourOpen, setGuideOpen } = uiSlice.actions;
 export const { deviceUpdated, deviceRemoved, commandUpdated, sceneExecutionUpdated, cameraViewers, resetLive } = liveSlice.actions;
 export const { pushToast, dismissToast, announce } = feedbackSlice.actions;
 

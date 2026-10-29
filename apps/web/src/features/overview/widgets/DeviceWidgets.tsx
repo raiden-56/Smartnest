@@ -5,14 +5,14 @@ import { describeOperatingState, hasCapability, type DeviceDto } from '@smartnes
 import { useDevicesQuery } from '../../../api/api';
 import { timeAgo, useFormatTemperature, useHome } from '../../../app/hooks';
 import { useLiveDevice, useLiveDevices } from '../../../app/store';
-import { DeviceCard, DeviceTile } from '../../../components/devices/DeviceCard';
+import { DeviceCompactCard, DeviceTile } from '../../../components/devices/DeviceCard';
 import { CommandStatus } from '../../../components/devices/CapabilityControls';
 import { HvacModeControl, ThermostatControl } from '../../../components/devices/controls/Controls';
 import { controlsDisabledReason, useDeviceCommand } from '../../../components/devices/useDeviceCommand';
 import { ConnectivityBadge, DemoBadge } from '../../../components/common/StatusBadge';
 import { ErrorState, ListSkeleton, NotAvailable } from '../../../components/common/States';
 import { tokens } from '../../../theme/theme';
-import { WidgetCard, WidgetEmpty, WidgetRow, useWidgetContext, type WidgetProps } from './WidgetFrame';
+import { MoreLink, WidgetCard, WidgetEmpty, WidgetRow, type WidgetProps } from './WidgetFrame';
 import { attentionReason, isLowBattery, useAttentionDevices, useSecurityDevices } from './useOverviewData';
 
 const deviceLink = (d: DeviceDto) => (
@@ -23,9 +23,11 @@ const deviceLink = (d: DeviceDto) => (
 
 // ─── Favourites ───────────────────────────────────────────────────────────
 
+const FAVOURITES_SHOWN = 9;
+const LIST_SHOWN = 5;
+
 export function FavouritesWidget(_: WidgetProps) {
   const { homeId, can } = useHome();
-  const { stacked } = useWidgetContext();
   const q = useDevicesQuery({ homeId, favourite: 'true', pageSize: 24 }, { skip: !can('devices.view') });
   const devices = useLiveDevices(q.data?.items);
   return (
@@ -53,11 +55,14 @@ export function FavouritesWidget(_: WidgetProps) {
           }
         />
       ) : (
-        <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: stacked ? '1fr' : 'repeat(auto-fill, minmax(230px, 1fr))', pb: 0.5 }}>
-          {devices.map((d) => (
-            <DeviceCard key={d.id} device={d} />
-          ))}
-        </Box>
+        <>
+          <Box sx={{ display: 'grid', gap: 1, gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 230px), 1fr))' }}>
+            {devices.slice(0, FAVOURITES_SHOWN).map((d) => (
+              <DeviceCompactCard key={d.id} device={d} />
+            ))}
+          </Box>
+          <MoreLink to="/devices?favourite=true" hidden={devices.length - FAVOURITES_SHOWN} noun="favourites" />
+        </>
       )}
     </WidgetCard>
   );
@@ -89,7 +94,7 @@ export function SecurityWidget(_: WidgetProps) {
         <WidgetEmpty icon={<ShieldCheck size={20} />} title="No security devices" description="Locks, alarm panels, door/window and safety sensors appear here once imported." />
       ) : (
         <Box>
-          {sorted.map((d) => {
+          {sorted.slice(0, LIST_SHOWN).map((d) => {
             const st = securityState(d);
             const Icon = hasCapability(d.capabilities, 'lock') ? (d.state.lockState === 'locked' ? Lock : LockOpen) : st.ok === false ? AlertTriangle : st.ok ? CheckCircle2 : ShieldCheck;
             return (
@@ -109,6 +114,7 @@ export function SecurityWidget(_: WidgetProps) {
               />
             );
           })}
+          <MoreLink to="/devices" hidden={sorted.length - LIST_SHOWN} noun="security devices" />
         </Box>
       )}
     </WidgetCard>
@@ -131,7 +137,7 @@ export function LowBatteryWidget(_: WidgetProps) {
         <WidgetEmpty icon={<CheckCircle2 size={20} />} title="All batteries OK" description="No battery-powered device reports 20% or less." />
       ) : (
         <Box>
-          {devices.map((d) => (
+          {devices.slice(0, LIST_SHOWN).map((d) => (
             <WidgetRow
               key={d.id}
               leading={<DeviceTile device={d} size={32} />}
@@ -140,6 +146,7 @@ export function LowBatteryWidget(_: WidgetProps) {
               trailing={<Chip size="small" icon={<BatteryLow size={14} />} label={`${d.state.batteryLevel}%`} sx={{ bgcolor: '#F8E4E2', color: 'error.main', '& .MuiChip-icon': { color: 'inherit' } }} />}
             />
           ))}
+          <MoreLink to="/devices?battery=low" hidden={devices.length - LIST_SHOWN} noun="devices" />
         </Box>
       )}
     </WidgetCard>
@@ -160,7 +167,7 @@ export function AttentionWidget(_: WidgetProps) {
         <WidgetEmpty icon={<CheckCircle2 size={20} />} title="Everything is reachable" description="No offline, unavailable or erroring devices." />
       ) : (
         <Box>
-          {devices.map((d) => {
+          {devices.slice(0, LIST_SHOWN).map((d) => {
             const reason = attentionReason(d)!;
             const conn = d.connectivity !== 'online' || d.integrationDisconnected;
             return (
@@ -173,6 +180,7 @@ export function AttentionWidget(_: WidgetProps) {
               />
             );
           })}
+          <MoreLink to="/devices?connectivity=offline" hidden={devices.length - LIST_SHOWN} noun="devices" />
         </Box>
       )}
     </WidgetCard>

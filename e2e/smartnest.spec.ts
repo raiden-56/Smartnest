@@ -65,6 +65,15 @@ test('complete home setup, control, scenes, automations and disconnection', asyn
   await page.getByRole('button', { name: 'Go to my dashboard' }).click();
   await page.waitForURL((u) => u.pathname === '/');
 
+  // First dashboard visit: the guided tour starts by itself, walks through features and can be skipped
+  await expect(page.getByRole('dialog', { name: 'Welcome to SmartNest' })).toBeVisible();
+  await page.getByRole('button', { name: 'Start tour' }).click();
+  await expect(page.getByRole('dialog', { name: 'Your homes' })).toBeVisible();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('dialog', { name: 'Overview' })).toBeVisible();
+  await page.getByRole('button', { name: 'Skip tour' }).click();
+  await expect(page.getByRole('dialog', { name: 'Overview' })).toHaveCount(0);
+
   // 7. Assign a device to a room manually
   await openDevice(page, 'Coffee Maker');
   await page.getByLabel('Room', { exact: true }).click();

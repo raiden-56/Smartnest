@@ -231,7 +231,7 @@ export default function DevicesPage() {
       <AnimatePresence>
         {selectMode && (
           <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: tokens.motion.fast }}>
-            <Paper sx={{ p: 1.5, mb: 2, border: `1px solid ${tokens.color.primary}`, position: 'sticky', top: 72, zIndex: 5 }}>
+            <Paper sx={{ p: 1.5, mb: 2, border: `1px solid ${tokens.color.primary}`, position: 'sticky', top: 8, zIndex: 5 }}>
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'center' }}>
                 <Typography fontWeight={600} sx={{ mr: 1 }} role="status">
                   {selected.size} selected

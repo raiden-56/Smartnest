@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import {
   Avatar, BottomNavigation, BottomNavigationAction, Box, Button, Chip, Divider, Drawer, IconButton, List, ListItemButton, ListItemIcon, ListItemText,
   ListSubheader, Menu, MenuItem, Paper, Stack, Tooltip, Typography, useMediaQuery, useTheme,
@@ -18,6 +18,7 @@ import { DemoBadge } from '../common/StatusBadge';
 import { DetailSkeleton } from '../common/States';
 import { NotificationsButton } from '../../features/notifications/NotificationsButton';
 import { SearchDialog } from '../../features/search/SearchDialog';
+import { FeatureGuideDialog, HelpMenu, ProductTour, useTourAutoStart } from '../../features/help/ProductTour';
 import { NAV } from './nav';
 
 const SIDEBAR_W = 248;
@@ -52,6 +53,7 @@ function NavList({ collapsed, onNavigate }: { collapsed?: boolean; onNavigate?: 
             to={n.to}
             end={n.to === '/'}
             onClick={onNavigate}
+            data-tour={`nav-${n.to}`}
             sx={{
               borderRadius: `${tokens.radius.sm + 2}px`, minHeight: 44, px: collapsed ? 1.75 : 1.5, color: 'text.secondary',
               '&.active': { bgcolor: 'primary.main', color: '#fff', '& .MuiListItemIcon-root': { color: '#fff' }, '&:hover': { bgcolor: 'primary.dark' } },
@@ -78,6 +80,7 @@ function HomeSwitcher() {
     <>
       <Button
         onClick={(e) => setAnchor(e.currentTarget)}
+        data-tour="home-switcher"
         endIcon={<ChevronDown size={16} />}
         startIcon={<Home size={18} />}
         sx={{ color: 'text.primary', bgcolor: 'background.paper', border: `1px solid ${tokens.color.border}`, maxWidth: { xs: 170, sm: 260 }, '& .MuiButton-startIcon': { color: 'primary.main' } }}
@@ -137,10 +140,10 @@ function QuickActions() {
   const favs = scenes.data?.scenes.filter((s) => s.isFavourite).slice(0, 4) ?? [];
   return (
     <>
-      <Button variant="contained" color="primary" startIcon={<Plus size={18} />} onClick={(e) => setAnchor(e.currentTarget)} aria-haspopup="menu" sx={{ display: { xs: 'none', sm: 'inline-flex' } }}>
+      <Button data-tour="quick-action" variant="contained" color="primary" startIcon={<Plus size={18} />} onClick={(e) => setAnchor(e.currentTarget)} aria-haspopup="menu" sx={{ display: { xs: 'none', sm: 'inline-flex' } }}>
         Quick action
       </Button>
-      <IconButton aria-label="Quick actions" onClick={(e) => setAnchor(e.currentTarget)} sx={{ display: { xs: 'inline-flex', sm: 'none' }, bgcolor: 'primary.main', color: '#fff', '&:hover': { bgcolor: 'primary.dark' } }}>
+      <IconButton data-tour="quick-action" aria-label="Quick actions" onClick={(e) => setAnchor(e.currentTarget)} sx={{ display: { xs: 'inline-flex', sm: 'none' }, bgcolor: 'primary.main', color: '#fff', '&:hover': { bgcolor: 'primary.dark' } }}>
         <Plus size={20} />
       </IconButton>
       <Menu anchorEl={anchor} open={!!anchor} onClose={() => setAnchor(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
@@ -243,6 +246,7 @@ function RealtimeIndicator() {
   return (
     <Tooltip title={live ? 'Receiving live updates' : status === 'offline' ? 'Live updates stopped. Sign in again.' : 'Reconnecting to live updates… Values may be out of date.'}>
       <Chip
+        data-tour="live"
         size="small"
         icon={live ? <Wifi size={14} /> : <WifiOff size={14} />}
         label={live ? 'Live' : status === 'connecting' ? 'Connecting' : 'Reconnecting'}
@@ -263,7 +267,15 @@ export function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
+  const me = useMeQuery();
   useRealtime(homeId);
+  useTourAutoStart(me.data?.user.id, location.pathname === '/');
+
+  // Only the content area scrolls, so reset it (not the window) when the page changes.
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0 });
+  }, [location.pathname]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -281,7 +293,8 @@ export function AppShell() {
   const activeMobile = mobilePrimary.findIndex((n) => (n.to === '/' ? location.pathname === '/' : location.pathname.startsWith(n.to)));
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
+    // Fixed app frame: sidebar and top bar stay put, only <main> scrolls.
+    <Box sx={{ display: 'flex', height: '100dvh', overflow: 'hidden', bgcolor: 'background.default' }}>
       <Box component="a" href="#main" sx={{ position: 'absolute', left: -9999, '&:focus': { left: 16, top: 16, zIndex: 2000, bgcolor: 'background.paper', p: 1.5, borderRadius: 2 } }}>
         Skip to content
       </Box>
@@ -291,7 +304,7 @@ export function AppShell() {
         <motion.aside
           animate={{ width: isDesktop ? sidebarWidth : SIDEBAR_COLLAPSED_W }}
           transition={{ duration: tokens.motion.base, ease: 'easeOut' }}
-          style={{ flexShrink: 0, position: 'sticky', top: 0, height: '100vh', overflow: 'hidden', borderRight: `1px solid ${tokens.color.border}`, background: '#FBFAF6' }}
+          style={{ flexShrink: 0, height: '100%', overflow: 'hidden', borderRight: `1px solid ${tokens.color.border}`, background: '#FBFAF6' }}
           aria-label="Sidebar"
         >
           <Stack sx={{ height: '100%', py: 2.5 }}>
@@ -319,12 +332,9 @@ export function AppShell() {
         </motion.aside>
       )}
 
-      <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+      <Box sx={{ flex: 1, minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
         {/* Top bar */}
-        <Box
-          component="header"
-          sx={{ position: 'sticky', top: 0, zIndex: 10, bgcolor: 'rgba(247,246,240,0.88)', backdropFilter: 'blur(8px)', borderBottom: `1px solid ${tokens.color.border}` }}
-        >
+        <Box component="header" sx={{ flexShrink: 0, zIndex: 10, bgcolor: 'background.default', borderBottom: `1px solid ${tokens.color.border}` }}>
           <Stack direction="row" alignItems="center" spacing={{ xs: 1, sm: 1.5 }} sx={{ px: { xs: 2, md: 3 }, py: 1.25, maxWidth: 1600, mx: 'auto' }}>
             {isMobile && (
               <IconButton aria-label="Open navigation menu" onClick={() => setDrawerOpen(true)} edge="start">
@@ -339,6 +349,7 @@ export function AppShell() {
             )}
             <Box sx={{ flex: 1 }} />
             <Button
+              data-tour="search"
               onClick={() => dispatch(setSearchOpen(true))}
               startIcon={<Search size={17} />}
               sx={{ display: { xs: 'none', md: 'inline-flex' }, color: 'text.secondary', bgcolor: 'background.paper', border: `1px solid ${tokens.color.border}`, minWidth: 220, justifyContent: 'flex-start' }}
@@ -349,23 +360,28 @@ export function AppShell() {
                 Ctrl K
               </Box>
             </Button>
-            <IconButton aria-label="Search" onClick={() => dispatch(setSearchOpen(true))} sx={{ display: { xs: 'inline-flex', md: 'none' } }}>
+            <IconButton data-tour="search" aria-label="Search" onClick={() => dispatch(setSearchOpen(true))} sx={{ display: { xs: 'inline-flex', md: 'none' } }}>
               <Search size={20} />
             </IconButton>
             <RealtimeIndicator />
-            <NotificationsButton />
+            <Box data-tour="notifications" sx={{ display: 'inline-flex' }}>
+              <NotificationsButton />
+            </Box>
+            <HelpMenu />
             <QuickActions />
             <UserMenu />
           </Stack>
         </Box>
 
-        <Box component="main" id="main" tabIndex={-1} sx={{ flex: 1, px: { xs: 2, md: 3 }, pt: { xs: 2.5, md: 3.5 }, pb: { xs: 12, md: 5 }, width: '100%', maxWidth: 1600, mx: 'auto', outline: 'none' }}>
-          {/* Enter-only transition: never delays navigation and cannot get stuck behind a suspending lazy route */}
-          <Suspense fallback={<DetailSkeleton />}>
-            <motion.div key={location.pathname.split('/').slice(0, 3).join('/')} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: tokens.motion.fast }}>
-              <Outlet />
-            </motion.div>
-          </Suspense>
+        <Box component="main" id="main" ref={mainRef} tabIndex={-1} sx={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto', overflowX: 'hidden', outline: 'none' }}>
+          <Box sx={{ px: { xs: 2, md: 3 }, pt: { xs: 2, md: 2.5 }, pb: { xs: 12, md: 4 }, width: '100%', maxWidth: 1600, mx: 'auto' }}>
+            {/* Enter-only transition: never delays navigation and cannot get stuck behind a suspending lazy route */}
+            <Suspense fallback={<DetailSkeleton />}>
+              <motion.div key={location.pathname.split('/').slice(0, 3).join('/')} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: tokens.motion.fast }}>
+                <Outlet />
+              </motion.div>
+            </Suspense>
+          </Box>
         </Box>
       </Box>
 
@@ -374,7 +390,7 @@ export function AppShell() {
         <Paper component="nav" aria-label="Primary" sx={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 20, borderTop: `1px solid ${tokens.color.border}`, borderRadius: 0, pb: 'env(safe-area-inset-bottom)' }}>
           <BottomNavigation showLabels value={activeMobile === -1 ? mobilePrimary.length : activeMobile} sx={{ height: 64 }}>
             {mobilePrimary.map((n) => (
-              <BottomNavigationAction key={n.to} label={n.label} icon={<n.icon size={22} />} onClick={() => navigate(n.to)} sx={{ minWidth: 0, '&.Mui-selected': { color: 'primary.main' } }} />
+              <BottomNavigationAction key={n.to} data-tour={`nav-${n.to}`} label={n.label} icon={<n.icon size={22} />} onClick={() => navigate(n.to)} sx={{ minWidth: 0, '&.Mui-selected': { color: 'primary.main' } }} />
             ))}
             <BottomNavigationAction label="More" icon={<MoreHorizontal size={22} />} onClick={() => setDrawerOpen(true)} sx={{ minWidth: 0 }} />
           </BottomNavigation>
@@ -388,6 +404,8 @@ export function AppShell() {
       </Drawer>
 
       <SearchDialog />
+      <FeatureGuideDialog />
+      <ProductTour />
     </Box>
   );
 }

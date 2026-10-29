@@ -46,6 +46,17 @@ export function DemoBadge({ compact }: { compact?: boolean }) {
   );
 }
 
+/** Minimal demo marker for dense rows: an icon with an accessible label and explanation on hover. */
+export function DemoMark() {
+  return (
+    <Tooltip title="Demo: simulated device or data, nothing physical is controlled.">
+      <Box component="span" role="img" aria-label="Demo" tabIndex={0} sx={{ display: 'inline-flex', color: '#8A4B12', flexShrink: 0 }}>
+        <FlaskConical size={13} aria-hidden />
+      </Box>
+    </Tooltip>
+  );
+}
+
 export function SeverityDot({ severity }: { severity: 'info' | 'success' | 'warning' | 'critical' }) {
   const color = { info: tokens.color.textSecondary, success: tokens.color.success, warning: tokens.color.warning, critical: tokens.color.error }[severity];
   return <Box component="span" aria-hidden sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: color, display: 'inline-block', flexShrink: 0 }} />;

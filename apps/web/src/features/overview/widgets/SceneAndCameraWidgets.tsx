@@ -80,11 +80,11 @@ function SceneButton({ scene, canRun }: { scene: SceneDto; canRun: boolean }) {
       aria-label={`Run scene ${scene.name}${scene.requiresConfirmation ? ' (requires confirmation)' : ''}`}
       sx={{
         borderRadius: `${tokens.radius.md}px`, border: `1px solid ${tokens.color.border}`, bgcolor: running ? 'sage.light' : '#FCFBF8', p: 1.25, display: 'flex', alignItems: 'center',
-        justifyContent: 'flex-start', gap: 1.25, textAlign: 'left', minHeight: 56, transition: 'background-color 150ms, border-color 150ms',
+        justifyContent: 'flex-start', gap: 1, textAlign: 'left', minHeight: 50, transition: 'background-color 150ms, border-color 150ms',
         '&:hover': { borderColor: 'primary.light', bgcolor: 'sage.light' }, '&.Mui-disabled': { opacity: canRun ? 1 : 0.6 },
       }}
     >
-      <Box sx={{ width: 34, height: 34, borderRadius: '10px', bgcolor: 'sage.main', color: 'primary.dark', display: 'grid', placeItems: 'center', flexShrink: 0 }} aria-hidden>
+      <Box sx={{ width: 30, height: 30, borderRadius: '9px', bgcolor: 'sage.main', color: 'primary.dark', display: 'grid', placeItems: 'center', flexShrink: 0 }} aria-hidden>
         {running ? <CircularProgress size={16} thickness={5} /> : <AppIcon name={scene.icon} size={17} />}
       </Box>
       <Box sx={{ minWidth: 0, flex: 1 }}>
@@ -112,7 +112,7 @@ export function QuickActionsWidget(_: WidgetProps) {
   const { homeId, can } = useHome();
   const q = useScenesQuery(homeId);
   const scenes = q.data?.scenes ?? [];
-  const shown = (scenes.some((s) => s.isFavourite) ? scenes.filter((s) => s.isFavourite) : scenes).slice(0, 8);
+  const shown = (scenes.some((s) => s.isFavourite) ? scenes.filter((s) => s.isFavourite) : scenes).slice(0, 6);
   return (
     <WidgetCard
       title="Quick actions"
@@ -139,7 +139,7 @@ export function QuickActionsWidget(_: WidgetProps) {
           }
         />
       ) : (
-        <Box sx={{ display: 'grid', gap: 1, gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
+        <Box sx={{ display: 'grid', gap: 1, gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 140px), 1fr))' }}>
           {shown.map((s) => (
             <SceneButton key={s.id} scene={s} canRun={can('scenes.activate')} />
           ))}
@@ -277,14 +277,14 @@ export function CameraWidget({ widget }: WidgetProps) {
       title="Camera"
       action={
         camera && (
-          <Stack direction="row" spacing={0.5} alignItems="center">
+          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
             {cameras.length > 1 && (
               <Select
                 size="small"
                 value={camera.device.id}
                 onChange={(e) => setSelected(String(e.target.value))}
                 inputProps={{ 'aria-label': 'Choose camera' }}
-                sx={{ maxWidth: 150, '& .MuiSelect-select': { py: 0.5, fontSize: '0.82rem' } }}
+                sx={{ minWidth: 0, maxWidth: 150, flexShrink: 1, '& .MuiSelect-select': { py: 0.5, fontSize: '0.82rem' } }}
               >
                 {cameras.map((c) => (
                   <MenuItem key={c.device.id} value={c.device.id}>

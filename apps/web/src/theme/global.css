@@ -4,6 +4,11 @@ body { margin: 0; overflow-x: hidden; }
 @keyframes sn-spin { to { transform: rotate(360deg); } }
 .spin { animation: sn-spin 0.9s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
-/* react-grid-layout placeholder & handles, themed */
-.react-grid-item.react-grid-placeholder { background: #E4EBDD !important; border: 2px dashed #386641; border-radius: 22px; opacity: 0.8 !important; }
-.react-grid-item > .react-resizable-handle::after { border-color: #737971 !important; }
+
+/* Thin, quiet scrollbars everywhere (Firefox + Chromium/WebKit) */
+* { scrollbar-width: thin; scrollbar-color: #CFCDC4 transparent; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #CFCDC4; border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: #A9ADA5; }
+::-webkit-scrollbar-button { display: none; height: 0; width: 0; }

@@ -202,7 +202,7 @@ function AutoDismiss({ id, ms }: { id: string; ms: number }) {
 export function LiveAnnouncer() {
   const message = useAppSelector((s) => s.feedback.announcement);
   return (
-    <Box role="status" aria-live="polite" aria-atomic="true" sx={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>
+    <Box role="status" aria-live="polite" aria-atomic="true" sx={{ position: 'absolute', top: 0, left: 0, width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>
       {message}
     </Box>
   );

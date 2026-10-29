@@ -10,7 +10,7 @@ import { pushToast, useAppDispatch, useLiveDevice } from '../../app/store';
 import { tokens } from '../../theme/theme';
 import { AppIcon, deviceIconName } from '../common/AppIcon';
 import { useConfirm } from '../common/Dialogs';
-import { ConnectivityBadge, DemoBadge } from '../common/StatusBadge';
+import { ConnectivityBadge, DemoBadge, DemoMark } from '../common/StatusBadge';
 import { QuickControl } from './CapabilityControls';
 
 export function DeviceTile({ device, size = 44 }: { device: DeviceDto; size?: number }) {
@@ -183,8 +183,8 @@ export const DeviceCard = memo(function DeviceCard({ device: initial, selectable
           )}
         </Stack>
 
-        <Stack direction="row" alignItems="flex-end" justifyContent="space-between" spacing={1} sx={{ mt: 'auto' }}>
-          <Box sx={{ minWidth: 0 }}>
+        <Stack direction="row" alignItems="flex-end" justifyContent="space-between" flexWrap="wrap" useFlexGap columnGap={1} rowGap={1} sx={{ mt: 'auto' }}>
+          <Box sx={{ minWidth: 0, flex: '1 1 90px' }}>
             <Typography variant="body2" fontWeight={600} noWrap>
               {device.connectivity === 'online' ? (op ?? '') : op ? `Last known: ${op}` : ''}
             </Typography>
@@ -192,12 +192,56 @@ export const DeviceCard = memo(function DeviceCard({ device: initial, selectable
               Updated {timeAgo(device.stateUpdatedAt)}
             </Typography>
           </Box>
-          <Box sx={{ flexShrink: 0 }}>
+          <Box sx={{ flexShrink: 0, ml: 'auto' }}>
             <QuickControl device={device} />
           </Box>
         </Stack>
       </Card>
     </motion.div>
+  );
+});
+
+/** Dense card for the dashboard: icon, name, state and the primary control on one line. */
+export const DeviceCompactCard = memo(function DeviceCompactCard({ device: initial }: { device: DeviceDto }) {
+  const device = useLiveDevice(initial);
+  const op = describeOperatingState(device.state, device.capabilities);
+  const online = device.connectivity === 'online' && !device.integrationDisconnected;
+  return (
+    <Card
+      sx={{
+        p: 1.25, display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 1.25, rowGap: 1, minWidth: 0, boxShadow: 'none', transition: 'border-color 150ms',
+        '&:hover': { borderColor: 'primary.light' }, '&:focus-within': { borderColor: 'primary.light' },
+      }}
+    >
+      <DeviceTile device={device} size={38} />
+      {/* Name and state take the row; a wide control (e.g. cover buttons) wraps underneath instead of squeezing it. */}
+      <Box sx={{ minWidth: 0, flex: '1 1 110px' }}>
+        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
+          <Typography
+            component={RouterLink}
+            to={`/devices/${device.id}`}
+            noWrap
+            title={device.name}
+            sx={{ color: 'text.primary', textDecoration: 'none', fontWeight: 650, fontSize: '0.9rem', '&:hover': { textDecoration: 'underline' } }}
+          >
+            {device.name}
+          </Typography>
+          {device.isDemo && <DemoMark />}
+        </Stack>
+        {online ? (
+          <Typography variant="caption" noWrap component="div" title={`Updated ${timeAgo(device.stateUpdatedAt)}`}>
+            {[op, device.roomName].filter(Boolean).join(' · ') || 'No state reported'}
+          </Typography>
+        ) : (
+          <Box sx={{ mt: 0.25 }}>
+            <ConnectivityBadge state={device.connectivity} integrationDisconnected={device.integrationDisconnected} />
+          </Box>
+        )}
+      </Box>
+      <Box sx={{ flexShrink: 0, ml: 'auto' }}>
+        <QuickControl device={device} />
+      </Box>
+    </Card>
   );
 });
 
