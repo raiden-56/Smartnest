@@ -1,0 +1,50 @@
+# Render Blueprint — deploys SmartNest straight from this GitHub repository.
+# Render dashboard → New → Blueprint → pick this repo. See docs/deployment.md ("Hosting from GitHub").
+#
+# Free plans are fine for trying SmartNest out, but note:
+#   - a free web service sleeps after ~15 minutes without traffic, which pauses automations,
+#     schedules and live integration connections until the next visit;
+#   - a free Postgres database expires after 30 days.
+# For a home you actually rely on, use plan: starter (web) and a paid database plan.
+
+services:
+  - type: web
+    name: smartnest
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    # Deploy only after the GitHub Actions checks (CI + image publish) pass for the commit.
+    autoDeployTrigger: checksPass
+    # SmartNest keeps integration connections and the scheduler in-process: exactly one instance.
+    numInstances: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: smartnest-db
+          property: connectionString
+      # Generated once by Render and kept across deploys. Back up CREDENTIAL_ENCRYPTION_KEY —
+      # without it, stored integration tokens cannot be decrypted.
+      - key: CREDENTIAL_ENCRYPTION_KEY
+        generateValue: true
+      - key: STREAM_TOKEN_SECRET
+        generateValue: true
+      # A cloud-hosted server must not reach private networks (SSRF protection). Connect Home Assistant
+      # through a public HTTPS URL (e.g. Nabu Casa) instead.
+      - key: ALLOW_PRIVATE_INTEGRATION_HOSTS
+        value: "false"
+      - key: LOG_LEVEL
+        value: info
+      # WEB_ORIGIN and PUBLIC_APP_URL default to the service's Render URL (RENDER_EXTERNAL_URL).
+      # Set both to https://your-domain if you add a custom domain.
+
+databases:
+  - name: smartnest-db
+    plan: free
+    databaseName: smartnest
+    user: smartnest
+    postgresMajorVersion: "16"
+    ipAllowList: [] # internal connections from the web service only

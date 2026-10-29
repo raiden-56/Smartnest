@@ -57,6 +57,10 @@ In SmartNest go to **Integrations → Add integration → Home Assistant**, ente
 | `npm run mock-ha` | Mock Home Assistant for manual testing |
 | `npm run lint:secrets` | Fails if anything that looks like a secret is tracked by git |
 
+## Hosting & CI/CD
+
+GitHub Actions runs the full test suite on every pull request and, on pushes to `master`, publishes a Docker image to GitHub Container Registry. `render.yaml` deploys the app and its PostgreSQL database from this repository on Render (**New → Blueprint**), only after the checks pass. See [Hosting from GitHub](docs/deployment.md#hosting-from-github).
+
 ## Project layout
 
 ```
