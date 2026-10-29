@@ -2,7 +2,7 @@
 # Build:  docker build -t smartnest .
 # Run:    see docs/deployment.md (needs DATABASE_URL, CREDENTIAL_ENCRYPTION_KEY, STREAM_TOKEN_SECRET)
 
-FROM node:22-bookworm-slim AS build
+FROM node:25-bookworm-slim AS build
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json tsconfig.base.json ./
@@ -15,7 +15,7 @@ RUN npm ci --no-audit --no-fund
 COPY . .
 RUN npm run build && npm prune --omit=dev --workspaces --include-workspace-root
 
-FROM node:22-bookworm-slim AS runtime
+FROM node:25-bookworm-slim AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/* \
