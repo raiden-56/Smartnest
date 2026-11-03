@@ -14,7 +14,7 @@
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@fontsource-variable/dm-sans": "^5.1.0",
-    "@hookform/resolvers": "^3.10.0",
+    "@hookform/resolvers": "^6.0.0",
     "@mui/material": "^6.5.0",
     "@reduxjs/toolkit": "^2.13.0",
     "@smartnest/shared": "*",
